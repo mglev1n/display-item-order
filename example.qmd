@@ -1,0 +1,44 @@
+---
+title: "My Document"
+filters:
+  - quarto
+  - display-item-order
+crossref:
+  fig-prefix: Figure            # Regular figures
+  custom:
+    - kind: float
+      key: suppfig             # Key for ordering
+      reference-prefix: "Supplementary Figure"
+    - kind: float
+      key: etbl               # Key for ordering
+      reference-prefix: "Extended Table"
+display-item-order:
+  - fig      # Regular figures first
+  - etbl     # Extended tables second
+  - suppfig  # Supplementary figures last
+---
+
+## Introduction
+
+This paper includes regular figures (@fig-main), extended tables (@etbl-data), 
+and supplementary figures (@suppfig-additional).
+
+```{r}
+#| label: fig-main
+#| fig-cap: "Main analysis"
+plot(cars)
+```
+
+::: {#suppfig-additional}
+```{r}
+#| fig-cap: "Supplementary analysis"
+plot(pressure)
+```
+:::
+
+::: {#etbl-data}
+```{r}
+#| tbl-cap: "Extended data table"
+pressure
+```
+:::
