@@ -5,7 +5,7 @@ A Quarto extension that collects and organizes figures, tables, and other cross-
 ## Installing
 
 ```bash
-quarto add username/display-item-order
+quarto add mglev1n/display-item-order
 ```
 
 This will install the extension under the `_extensions` subdirectory.
