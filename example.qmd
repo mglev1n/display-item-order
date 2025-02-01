@@ -1,8 +1,5 @@
 ---
 title: "My Document"
-filters:
-  - quarto
-  - display-item-order
 crossref:
   fig-prefix: Figure            # Regular figures
   custom:
@@ -12,6 +9,10 @@ crossref:
     - kind: float
       key: etbl               # Key for ordering
       reference-prefix: "Extended Table"
+self-contained: true
+filters:
+  - quarto
+  - display-item-order
 display-item-order:
   - fig      # Regular figures first
   - etbl     # Extended tables second
