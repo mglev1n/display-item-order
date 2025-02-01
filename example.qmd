@@ -34,6 +34,8 @@ and supplementary figures (@suppfig-additional). Notice the order of the display
 plot(cars)
 ```
 
+Some text
+
 ::: {#suppfig-additional}
 ```{r}
 #| fig-cap: "Supplementary analysis"
@@ -41,6 +43,8 @@ plot(cars)
 plot(pressure)
 ```
 :::
+
+More text
 
 ::: {#etbl-data}
 ```{r}

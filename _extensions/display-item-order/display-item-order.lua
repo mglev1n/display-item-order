@@ -12,7 +12,8 @@ local function parse_crossref_metadata(meta)
         key = "fig",
         id_prefix = "fig-",
         section_title = fig_section,
-        should_move = false  -- Will be set based on display-item-order
+        should_move = false,  -- Will be set based on display-item-order
+        order = 0            -- Will be set based on display-item-order
     })
 
     -- Default tables
@@ -24,7 +25,8 @@ local function parse_crossref_metadata(meta)
         key = "tbl",
         id_prefix = "tbl-",
         section_title = tbl_section,
-        should_move = false
+        should_move = false,
+        order = 0
     })
 
     -- Custom float entries
@@ -38,7 +40,8 @@ local function parse_crossref_metadata(meta)
                         key = key,
                         id_prefix = key .. '-',
                         section_title = ref_prefix .. 's',
-                        should_move = false
+                        should_move = false,
+                        order = 0
                     })
                 end
             end
@@ -54,21 +57,24 @@ local function mark_float_types_to_move(float_types, meta)
         return float_types
     end
 
-    -- Convert order to lookup table
+    -- Convert order to lookup table with position
     local order_lookup = {}
-    for _, item in ipairs(section_order) do
+    for pos, item in ipairs(section_order) do
         local key = pandoc.utils.stringify(item)
-        order_lookup[key] = true
+        order_lookup[key] = pos
     end
 
-    -- Mark which float types should be moved based on display-item-order
+    -- Mark which float types should be moved and set their order
     local move_list = {}
     local keep_list = {}
     for _, ft in ipairs(float_types) do
-        if order_lookup[ft.key] then
+        local order_pos = order_lookup[ft.key]
+        if order_pos then
             ft.should_move = true
+            ft.order = order_pos
             table.insert(move_list, ft.section_title)
         else
+            ft.order = math.huge  -- Set to highest possible value for non-moved items
             table.insert(keep_list, ft.section_title)
         end
     end
@@ -170,7 +176,6 @@ local function process_blocks(blocks, float_types)
 end
 
 function Pandoc(doc)
-    
     -- Check document format first
     if not (quarto.doc.is_format("docx") or quarto.doc.is_format("html")) then
         io.stderr:write("[display-item-order] WARNING: This filter is only compatible with DOCX and HTML outputs.\n")
@@ -186,7 +191,10 @@ function Pandoc(doc)
     -- Build final document
     local final_blocks = main_blocks
     
-    -- Add float sections in order (only for those in display-item-order)
+    -- Sort float_types by order
+    table.sort(float_types, function(a, b) return a.order < b.order end)
+    
+    -- Add float sections in sorted order (only for those in display-item-order)
     for _, ft in ipairs(float_types) do
         if ft.should_move then
             local section_blocks = float_blocks[ft.section_title]
