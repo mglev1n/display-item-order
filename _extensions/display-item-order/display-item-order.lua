@@ -11,7 +11,8 @@ local function parse_crossref_metadata(meta)
     table.insert(float_types, {
         key = "fig",
         id_prefix = "fig-",
-        section_title = fig_section
+        section_title = fig_section,
+        should_move = false  -- Will be set based on display-item-order
     })
 
     -- Default tables
@@ -22,7 +23,8 @@ local function parse_crossref_metadata(meta)
     table.insert(float_types, {
         key = "tbl",
         id_prefix = "tbl-",
-        section_title = tbl_section
+        section_title = tbl_section,
+        should_move = false
     })
 
     -- Custom float entries
@@ -35,56 +37,51 @@ local function parse_crossref_metadata(meta)
                     table.insert(float_types, {
                         key = key,
                         id_prefix = key .. '-',
-                        section_title = ref_prefix .. 's'
+                        section_title = ref_prefix .. 's',
+                        should_move = false
                     })
                 end
             end
         end
     end
 
-    -- Log configured float types
-    io.stderr:write("[display-item-order] Configured sections: ")
-    local sections = {}
-    for _, ft in ipairs(float_types) do
-        table.insert(sections, ft.section_title)
-    end
-    io.stderr:write(table.concat(sections, ", ") .. "\n")
-
     return float_types
 end
 
-local function get_ordered_float_types(float_types, meta)
+local function mark_float_types_to_move(float_types, meta)
     local section_order = meta['display-item-order']
     if not section_order then
         return float_types
     end
 
-    local order = {}
-    for i, item in ipairs(section_order) do
-        order[i] = pandoc.utils.stringify(item)
+    -- Convert order to lookup table
+    local order_lookup = {}
+    for _, item in ipairs(section_order) do
+        local key = pandoc.utils.stringify(item)
+        order_lookup[key] = true
     end
 
-    local float_lookup = {}
+    -- Mark which float types should be moved based on display-item-order
+    local move_list = {}
+    local keep_list = {}
     for _, ft in ipairs(float_types) do
-        float_lookup[ft.key] = ft
-    end
-
-    local ordered_types = {}
-    for _, key in ipairs(order) do
-        if float_lookup[key] then
-            table.insert(ordered_types, float_lookup[key])
-            float_lookup[key] = nil
+        if order_lookup[ft.key] then
+            ft.should_move = true
+            table.insert(move_list, ft.section_title)
+        else
+            table.insert(keep_list, ft.section_title)
         end
     end
 
-    -- Add any remaining types
-    for _, ft in ipairs(float_types) do
-        if float_lookup[ft.key] then
-            table.insert(ordered_types, ft)
-        end
+    -- Log configuration
+    if #move_list > 0 then
+        io.stderr:write("[display-item-order] Moving sections: " .. table.concat(move_list, ", ") .. "\n")
+    end
+    if #keep_list > 0 then
+        io.stderr:write("[display-item-order] Keeping in place: " .. table.concat(keep_list, ", ") .. "\n")
     end
 
-    return ordered_types
+    return float_types
 end
 
 -- Helper function to find float divs in a block
@@ -93,7 +90,7 @@ local function find_float_div(block, float_types)
     if block.t == "Div" and block.identifier then
         for _, ft in ipairs(float_types) do
             if block.identifier:match("^" .. ft.id_prefix) then
-                return block, ft.section_title
+                return block, ft.section_title, ft.should_move
             end
         end
     end
@@ -104,7 +101,7 @@ local function find_float_div(block, float_types)
             if child.t == "Div" then
                 for _, ft in ipairs(float_types) do
                     if child.identifier:match("^" .. ft.id_prefix) then
-                        return block, ft.section_title
+                        return block, ft.section_title, ft.should_move
                     end
                 end
             end
@@ -120,7 +117,7 @@ local function find_float_div(block, float_types)
                         if content.t == "Div" and content.identifier then
                             for _, ft in ipairs(float_types) do
                                 if content.identifier:match("^" .. ft.id_prefix) then
-                                    return block, ft.section_title
+                                    return block, ft.section_title, ft.should_move
                                 end
                             end
                         end
@@ -130,7 +127,7 @@ local function find_float_div(block, float_types)
         end
     end
     
-    return nil, nil
+    return nil, nil, false
 end
 
 local function process_blocks(blocks, float_types)
@@ -139,12 +136,17 @@ local function process_blocks(blocks, float_types)
     local float_counts = {}
     
     for _, block in ipairs(blocks) do
-        local float_block, section = find_float_div(block, float_types)
+        local float_block, section, should_move = find_float_div(block, float_types)
         
         if float_block and section then
-            float_blocks[section] = float_blocks[section] or {}
-            float_counts[section] = (float_counts[section] or 0) + 1
-            table.insert(float_blocks[section], float_block)
+            if should_move then
+                float_blocks[section] = float_blocks[section] or {}
+                float_counts[section] = (float_counts[section] or 0) + 1
+                table.insert(float_blocks[section], float_block)
+            else
+                -- Keep non-moved floats in their original position
+                table.insert(main_blocks, float_block)
+            end
         else
             if block.content then
                 -- Process nested content
@@ -168,8 +170,15 @@ local function process_blocks(blocks, float_types)
 end
 
 function Pandoc(doc)
+    
+    -- Check document format first
+    if not (quarto.doc.is_format("docx") or quarto.doc.is_format("html")) then
+        io.stderr:write("[display-item-order] WARNING: This filter is only compatible with DOCX and HTML outputs.\n")
+        return doc
+    end
+    
     local float_types = parse_crossref_metadata(doc.meta)
-    float_types = get_ordered_float_types(float_types, doc.meta)
+    float_types = mark_float_types_to_move(float_types, doc.meta)
     
     -- Process all blocks
     local main_blocks, float_blocks, float_counts = process_blocks(doc.blocks, float_types)
@@ -177,15 +186,17 @@ function Pandoc(doc)
     -- Build final document
     local final_blocks = main_blocks
     
-    -- Add float sections in order
+    -- Add float sections in order (only for those in display-item-order)
     for _, ft in ipairs(float_types) do
-        local section_blocks = float_blocks[ft.section_title]
-        if section_blocks and #section_blocks > 0 then
-            io.stderr:write(string.format("[display-item-order] Moving %d items to '%s'\n",
-                float_counts[ft.section_title], ft.section_title))
-            table.insert(final_blocks, pandoc.Header(2, ft.section_title))
-            for _, block in ipairs(section_blocks) do
-                table.insert(final_blocks, block)
+        if ft.should_move then
+            local section_blocks = float_blocks[ft.section_title]
+            if section_blocks and #section_blocks > 0 then
+                io.stderr:write(string.format("[display-item-order] Moving %d items to '%s'\n",
+                    float_counts[ft.section_title], ft.section_title))
+                table.insert(final_blocks, pandoc.Header(2, ft.section_title))
+                for _, block in ipairs(section_blocks) do
+                    table.insert(final_blocks, block)
+                end
             end
         end
     end

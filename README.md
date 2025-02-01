@@ -1,6 +1,6 @@
 # display-item-order
 
-A Quarto extension that collects and organizes figures, tables, and other cross-referenced items at the end of your document. This extension was designed with academic writing in mind, where these display items are frequently organized at the end of a document. Future versions may include more customization options for ordering, styling, and ignoring certain cross-referenced items.
+A Quarto extension that collects and organizes figures, tables, and other cross-referenced items at the end of your document. This extension was designed with academic writing in mind, where display items are frequently organized at the end of a document. Future versions may include more customization options for ordering, styling, and ignoring certain cross-referenced items.
 
 ## Installing
 
@@ -12,12 +12,12 @@ This will install the extension under the `_extensions` subdirectory.
 
 ## Using
 
-> [!IMPORTANT]
+> [!IMPORTANT]  
 > Make sure to list the filters in the correct order: 'quarto' must come before 'display-item-order' in your YAML configuration.
 
-### Basic Usage: Collecting Figures and Tables
+### Basic Usage: Moving Selected Display Items
 
-By default, this extension will collect all figures and tables with cross-references (prefixed with `fig-` and `tbl-`) and place them at the end of your document in sections titled "Figures" and "Tables".
+By default, all cross-referenced items remain in their original positions in the document. You can specify which items to move to the end using the `display-item-order` option:
 
 ````qmd
 ---
@@ -25,10 +25,10 @@ title: "My Document"
 filters:
   - quarto
   - display-item-order
+display-item-order:
+  - fig    # Move figures to the end
 ---
-
 ## Introduction
-
 Here's a reference to our figure (@fig-example) and table (@tbl-data).
 
 ```{r}
@@ -44,15 +44,14 @@ pressure
 ```
 
 ## Results
-
 More text here...
 ````
 
-The output will automatically move the figure and table to the end of the document under their respective sections, while maintaining all cross-references.
+In this example, only figures will be moved to the end of the document under a "Figures" section. Tables will remain in their original positions.
 
-### Customizing Section Order
+### Organizing Multiple Section Types
 
-You can control the order of sections using the `display-item-order` option:
+You can specify multiple types of items to move and control their order:
 
 ```yaml
 ---
@@ -61,10 +60,12 @@ filters:
   - quarto
   - display-item-order
 display-item-order:
-  - tbl    # Tables first
-  - fig    # Figures second
+  - tbl    # Move tables to end first
+  - fig    # Move figures to end second
 ---
 ```
+
+Any cross-referenced items not listed in `display-item-order` will remain in their original positions in the document.
 
 ### Advanced: Custom Cross-references
 
@@ -85,16 +86,17 @@ crossref:
     - kind: float
       key: etbl               # Key for ordering
       reference-prefix: "Extended Table"
+    - kind: float
+      key: efig               # Key for ordering
+      reference-prefix: "Extended Figure"
 display-item-order:
-  - fig      # Regular figures first
-  - etbl     # Extended tables second
-  - suppfig  # Supplementary figures last
+  - fig      # Move regular figures to end
+  - suppfig  # Move supplementary figures after regular figures
 ---
 
 ## Introduction
-
 This paper includes regular figures (@fig-main), extended tables (@etbl-data), 
-and supplementary figures (@suppfig-additional).
+supplementary figures (@suppfig-additional), and extended figures (@efig-extra).
 
 ```{r}
 #| label: fig-main
@@ -115,7 +117,19 @@ plot(pressure)
 pressure
 ```
 :::
+
+::: {#efig-extra}
+```{r}
+#| fig-cap: "Extended figure"
+plot(cars)
+```
+:::
 ````
+
+In this example:
+- Regular figures and supplementary figures will be moved to the end
+- Extended tables and extended figures will remain in their original positions
+- The moved items will be organized in the specified order (regular figures, then supplementary figures)
 
 ## Validation
 
@@ -124,7 +138,6 @@ The extension includes validation to ensure:
 2. No duplicate keys exist in `display-item-order`
 
 For example, this configuration would generate an error:
-
 ```yaml
 display-item-order:
   - fig
@@ -138,17 +151,19 @@ The extension:
 
 1. Processes your document after rendering (post-render)
 2. Identifies cross-referenced items based on their prefixes
-3. Collects these items while preserving their order within sections
-4. Creates sections at the end of your document
-5. Places items in their respective sections according to `display-item-order` (if specified). If a key is not explicitly specified in `display-item-order`, it will be placed at the end.
+3. For items specified in `display-item-order`:
+   - Collects these items while preserving their order within sections
+   - Creates sections at the end of your document
+   - Places items in their respective sections according to the specified order
+4. All other cross-referenced items remain in their original positions
 
 ## Use Cases
 
 This extension is particularly useful for:
 
-- Academic papers requiring figures and tables at the end
+- Academic papers requiring specific figures at the end while keeping other display items in-line
 - Documents with supplementary materials that need specific organization
-- Any document where you want to separate content from supporting visuals
+- Any document where you want to control which display items appear at the end versus in-line with the text
 
 ## Contributing
 

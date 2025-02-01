@@ -9,6 +9,9 @@ crossref:
     - kind: float
       key: etbl               # Key for ordering
       reference-prefix: "Extended Table"
+format:
+  html: default
+  docx: default
 self-contained: true
 filters:
   - quarto
@@ -22,17 +25,19 @@ display-item-order:
 ## Introduction
 
 This paper includes regular figures (@fig-main), extended tables (@etbl-data), 
-and supplementary figures (@suppfig-additional).
+and supplementary figures (@suppfig-additional). Notice the order of the display items in the rendered document is controlled by the `display-item-order` metadata.
 
 ```{r}
 #| label: fig-main
 #| fig-cap: "Main analysis"
+#| echo: false
 plot(cars)
 ```
 
 ::: {#suppfig-additional}
 ```{r}
 #| fig-cap: "Supplementary analysis"
+#| echo: false
 plot(pressure)
 ```
 :::
@@ -40,6 +45,7 @@ plot(pressure)
 ::: {#etbl-data}
 ```{r}
 #| tbl-cap: "Extended data table"
+#| echo: false
 pressure
 ```
 :::
