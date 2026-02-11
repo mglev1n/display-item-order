@@ -1,4 +1,11 @@
 -- Cross-reference filter for HTML and DOCX outputs
+-- Modified to add pagebreaks before float sections and after each float (DOCX only)
+
+-- Helper function to create a DOCX page break
+local function docx_pagebreak()
+    return pandoc.RawBlock("openxml", '<w:p><w:r><w:br w:type="page"/></w:r></w:p>')
+end
+
 local function parse_crossref_metadata(meta)
     local crossref = meta.crossref or {}
     local float_types = {}
@@ -12,8 +19,8 @@ local function parse_crossref_metadata(meta)
         key = "fig",
         id_prefix = "fig-",
         section_title = fig_section,
-        should_move = false,  -- Will be set based on display-item-order
-        order = 0            -- Will be set based on display-item-order
+        should_move = false,
+        order = 0
     })
 
     -- Default tables
@@ -74,7 +81,7 @@ local function mark_float_types_to_move(float_types, meta)
             ft.order = order_pos
             table.insert(move_list, ft.section_title)
         else
-            ft.order = math.huge  -- Set to highest possible value for non-moved items
+            ft.order = math.huge
             table.insert(keep_list, ft.section_title)
         end
     end
@@ -177,7 +184,10 @@ end
 
 function Pandoc(doc)
     -- Check document format first
-    if not (quarto.doc.is_format("docx") or quarto.doc.is_format("html")) then
+    local is_docx = quarto.doc.is_format("docx")
+    local is_html = quarto.doc.is_format("html")
+    
+    if not (is_docx or is_html) then
         io.stderr:write("[display-item-order] WARNING: This filter is only compatible with DOCX and HTML outputs.\n")
         return doc
     end
@@ -195,15 +205,29 @@ function Pandoc(doc)
     table.sort(float_types, function(a, b) return a.order < b.order end)
     
     -- Add float sections in sorted order (only for those in display-item-order)
+    local first_section = true
     for _, ft in ipairs(float_types) do
         if ft.should_move then
             local section_blocks = float_blocks[ft.section_title]
             if section_blocks and #section_blocks > 0 then
                 io.stderr:write(string.format("[display-item-order] Moving %d items to '%s'\n",
                     float_counts[ft.section_title], ft.section_title))
+                
+                -- Insert pagebreak before each float section (DOCX only)
+                if is_docx then
+                    table.insert(final_blocks, docx_pagebreak())
+                end
+                
                 table.insert(final_blocks, pandoc.Header(2, ft.section_title))
-                for _, block in ipairs(section_blocks) do
+                
+                for i, block in ipairs(section_blocks) do
                     table.insert(final_blocks, block)
+                    
+                    -- Insert pagebreak after each float except the last one in the section (DOCX only)
+                    -- The next section will add its own pagebreak before its header
+                    if is_docx and i < #section_blocks then
+                        table.insert(final_blocks, docx_pagebreak())
+                    end
                 end
             end
         end

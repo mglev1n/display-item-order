@@ -31,10 +31,17 @@ and supplementary figures (@suppfig-additional). Notice the order of the display
 #| label: fig-main
 #| fig-cap: "Main analysis"
 #| echo: false
-plot(cars)
+plot(cars[1:10,])
 ```
 
 Some text
+
+```{r}
+#| label: fig-secondary
+#| fig-cap: "Secondary figure"
+#| echo: false
+plot(cars[1:5,])
+```
 
 ::: {#suppfig-additional}
 ```{r}
